@@ -1,0 +1,10 @@
+name: contributionapp
+title:
+username: trizzzio
+account: trizzzio
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 13812969
+bundleId: 9703179
+url: https://trizzzio.shinyapps.io/contributionapp/
+version: 1

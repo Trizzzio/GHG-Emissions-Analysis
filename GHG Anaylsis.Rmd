@@ -1,0 +1,80 @@
+---
+title: "GHG Emission Analysis"
+author: "Patrick Thöni"
+date: "2025-01-24"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(readxl)
+library(DBI)
+library(RSQLite)
+library(scales)
+library(shiny)
+library(treemapify)
+library(ggplot2)
+library(patchwork)
+
+source("GHGgrowth.R")
+source("GHGpercapita.R")
+source("GHGcontributions.R")
+
+
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+This report is part of the application process to the "Data Science Analyst - Publication and visualisation team" position at the ECB. Using data from the latest EDGAR report on GHG emissions, I visualize and comment different trends of global GHG emissions. Here are the results:
+
+## Chart 1: Evolution of GHG Growth
+
+The chart below compares the evolution of GHG emissions in the Euro Area, EU27, and worldwide. Please note that the left axis show emission amounts (in MtCO2eq/yr) globally, while the right axis shows emissions for the Euro Area and EU27. 
+
+```{r chart1, echo=FALSE, fig.align="center", out.width="90%"}
+plot(combined_plot)
+```
+
+The following observations can be made from the analysis of GHG emission growth in the Euro Area, EU27 and globally: 
+
+-  Emissions in the EU27 have steadily decreased over the past decades.
+-  The euro area shows a similar trend but with smaller reductions.
+-  Global emissions show a continued increase over the wole time horizon.
+
+For an interactive version please explore this [$\color{blue}{\text{link}}$](https://trizzzio.shinyapps.io/growthapp/). 
+
+## Chart 2: GHG Emissions Per Capita by Income Groups
+
+The graph shows the evolution of GHG emissions per capita (expressed in tCO2eq/cap/yr) by income group.
+Income groups are based on World Bank classifications, the data was retrieved [$\color{blue}{\text{here}}$](https://datahelpdesk.worldbank.org/knowledgebase/articles/906519-world-bank-country-and-lending-groups). The earliest data for income groups starts in 1987. Countries with missing observations were discarded. Income Groups: H=High, L=Low, LM=Lower-Middle, UM=Upper-Middle.
+
+```{r chart2, echo=FALSE, fig.align="center", out.width="90%"}
+plot(capita)
+```
+
+The following observations can be made about the evolution of per capita GHG emissions aggregated by income classes: 
+
+-  High-income countries have by far the highest per capita emissions.
+-  The proportion of contributions by income class has remained fairly stable over the time horizon.
+-  Global emissions have slightly decreased over the last couple of decades.
+
+
+## Chart 3: Contribution to Total World GHG Emissions
+
+In order to visualize the contributions of continents and countries to global GHG emissions, I decided to use a treemap representation. The treemap below shows the contributions for the year 2023. For an interactive version showing the trends over the last decades please explore this [$\color{blue}{\text{link}}$](https://trizzzio.shinyapps.io/contributionapp/).
+
+```{r chart3, echo=FALSE, fig.align="center", out.width="90%"}
+plot(tree)
+```
+
+The following observations can be made. 
+
+- China and the USA are the largest contributors to global emissions.
+- Europe’s contribution has been declining (mostly due to green policies).
+- Emerging economies in Asia are increasing their share.
+
+## Tools and Process
+
+The data analysis underlying this report was performed in R using RStudio. Specifically, I imported the EGARD dataset  into an SQLite database for structured querying and manipulation. For data wrangling and analysis I used the tidyverse package (dplyr, ggplot2, ...). Additional interactive viualization were built using the shiny package and hosted on shiny.io. Finally, the results were combined in a pdf file using RMarkdown. The process and code can be seen on my [$\color{blue}{\text{github}}$](https://github.com/Trizzzio/GHG-Emissions-Analysis).
+
+
+

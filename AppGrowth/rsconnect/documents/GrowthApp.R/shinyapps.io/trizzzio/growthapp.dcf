@@ -1,0 +1,10 @@
+name: growthapp
+title:
+username: trizzzio
+account: trizzzio
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 13812549
+bundleId: 9702823
+url: https://trizzzio.shinyapps.io/growthapp/
+version: 1

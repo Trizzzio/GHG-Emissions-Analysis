@@ -1,6 +1,12 @@
 ###Evolution of GHG growth in the euro area, European Union (EU27) and worldwide;
+
 library(scales)
 library(shiny)
+library(patchwork)
+library(rsconnect)
+library(writexl)
+
+#Loading data
 
 db<- dbConnect(SQLite(), dbname="ghg_emissions.sqlite")
 
@@ -37,24 +43,31 @@ WHERE Country IN ('EU27', 'GLOBAL TOTAL');
 ")
 
 data <- dbGetQuery(db, query)
+
 cumdata<-data%>%
   mutate("EDGAR Country Code"=NULL)%>%
   pivot_longer(-Country, names_to = "year", values_to = "GHG_emissions")%>%
 pivot_wider(names_from = Country,values_from = GHG_emissions)%>%
   rename(Global="GLOBAL TOTAL")%>%
   mutate(year = as.numeric(year))%>%
-  mutate(cumsumEU=cumsum(EU),cumsumEU27=cumsum(EU27),cumsumTG=cumsum(Global))%>%
+  mutate(EU=cumsum(EU),EU27=cumsum(EU27),Global=cumsum(Global))%>%
   pivot_longer(-year,names_to = "Region", values_to = "GHG_emissions")
 
-#Separet dfs
+#Separate dfs
 
-ghg <- cumdata %>% filter(!str_detect(Region, "cumsum"))
-ghg_cumulative<- cumdata %>% filter(str_detect(Region, "cumsum"))
+ghg <-data%>%
+  mutate("EDGAR Country Code"=NULL)%>%
+  pivot_longer(-Country, names_to = "year", values_to = "GHG_emissions")%>%
+  pivot_wider(names_from = Country,values_from = GHG_emissions)%>%
+  rename(Global="GLOBAL TOTAL")%>%
+  mutate(year = as.numeric(year))%>%
+  pivot_longer(-year, names_to = "Region", values_to = "GHG_emissions")
+ghg_cumulative<- cumdata 
 
 ##Creating graph
 
 p1 <- ggplot() +
-  # Plot the Global emissions
+  # Plot Global emissions
   geom_line(data = filter(ghg, Region == "Global"), 
             aes(x = year, y = GHG_emissions, color = Region), 
             size = 1) +
@@ -65,91 +78,97 @@ p1 <- ggplot() +
   # Primary y-axis (Global emissions)
   scale_y_continuous(
     name = "Global GHG Emissions",
-    sec.axis = sec_axis(~ . / 5, name = "EU and EU27 GHG Emissions") # Secondary y-axis (scaled down)
+    labels = label_number(),
+    sec.axis = sec_axis(~ . / 5, name = NULL) # Remove secondary y-axis label
   ) +
   labs(
-    title = "GHG Emissions Over Time with Dual Y-Axes",
+    title = "Yearly GHG Emissions",
     x = "Year",
-    color = "Macro Region"
+    color = "Macro Regions"
   ) +
-  theme_minimal()
+  theme_minimal(base_size = 10) +
+  theme(
+    plot.title = element_text(hjust = 0.5), 
+    axis.text = element_text(size = 8),                   
+    axis.title.y = element_text(size = 9),              
+    axis.title.y.right = element_blank(),               
+    legend.position = "none"                             
+  )
+
+# Plot 2: Cumulative GHG Emissions
 
 p2 <- ggplot() +
-  # Plot the Global emissions
-  geom_line(data = filter(ghg_cumulative, Region == "cumsumTG"), 
+  # Plot Global emissions
+  geom_line(data = filter(ghg_cumulative, Region == "Global"), 
             aes(x = year, y = GHG_emissions, color = Region), 
             size = 1) +
   # Plot EU and EU27 emissions (scaled by 5 for visualization)
-  geom_line(data = filter(ghg_cumulative, Region != "cumsumTG"), 
+  geom_line(data = filter(ghg_cumulative, Region != "Global"), 
             aes(x = year, y = GHG_emissions * 5, color = Region), 
             size = 1) +
   # Primary y-axis (Global emissions)
   scale_y_continuous(
-    name = "Global GHG Emissions",
+    name = NULL, # Remove primary y-axis label
     labels = label_number(),
-    sec.axis = sec_axis(~ . / 5, name = "EU and EU27 GHG Emissions",labels = label_number()) # Secondary y-axis (scaled down)
+    sec.axis = sec_axis(~ . / 5, name = "EU and EU27 GHG Emissions", labels = label_number())
   ) +
   labs(
-    title = "GHG Emissions Over Time with Dual Y-Axes",
+    title = "Cumulative GHG Emissions",
     x = "Year",
-    color = "Macro Region"
+    color = "Macro Regions"
   ) +
-  theme_minimal()
+  theme_minimal(base_size = 10) +
+  theme(
+    plot.title = element_text(hjust = 0.5), 
+    axis.text = element_text(size = 8),                   
+    axis.title.y = element_blank(),                      
+    axis.title.y.right = element_text(size = 9),         
+    legend.position = "none"                              
+  )
 
-plot(p1)
-plot(p2)
+# Combine the two plots with patchwork
+combined_plot <- p1 + p2 +
+  plot_layout(guides = "collect") & 
+  theme(
+    legend.position = "bottom",                            
+    legend.title = element_text(size = 9),                 
+    legend.text = element_text(size = 8)                   
+  )
+
+# Display the combined plot
+plot(combined_plot)
 
 
 
-##Shiny App
+
+##Shiny App Data Preparation
 
 #Prepare data
 ghg_cum<-ghg_cumulative["GHG_emissions"]%>%rename(ghg_cumulative=GHG_emissions)
 shinydata<-cbind(ghg,ghg_cum)%>%
 rename(ghg_emissions=GHG_emissions,region=Region)
 
-ui <- fluidPage(
-  titlePanel("GHG Emissions Visualization"),
-  sidebarLayout(
-    sidebarPanel(
-      checkboxGroupInput(
-        "selected_regions", 
-        "Select Regions:", 
-        choices = unique(shinydata$region), 
-        selected = unique(shinydata$region)
-      ),
-      radioButtons(
-        "time_series_type", 
-        "Select Time Series Type:", 
-        choices = c("Simple" = "ghg_emissions", "Cumulative" = "ghg_cumulative"), 
-        selected = "ghg_emissions"
-      )
-    ),
-    mainPanel(
-      plotOutput("ghg_plot")
-    )
-  )
-)
-
-server <- function(input, output) {
-  output$ghg_plot <- renderPlot({
-    # Filter data based on user selection
-    filtered_data <- shinydata %>%
-      filter(region %in% input$selected_regions)
-    
-    # Create plot
-    ggplot(filtered_data, aes(x = year, y = !!sym(input$time_series_type), color = region)) +
-      geom_line(size = 1) +
-      labs(
-        title = "GHG Emissions Over Time",
-        x = "Year",
-        y = ifelse(input$time_series_type == "ghg_emissions", "GHG Emissions", "Cumulative GHG Emissions"),
-        color = "Region"
-      ) +
-      theme_minimal()
-  })
-}
-
-shinyApp(ui = ui, server = server)
+#write_xlsx(shinydata, "shinydata.xlsx")
 
 on.exit(dbDisconnect(db), add = TRUE)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
